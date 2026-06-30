@@ -240,6 +240,62 @@ class Score:
     def update(self, screen: pg.Surface):
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         screen.blit(self.image, self.rect)
+class EMP:
+    def __init__(self, emys: pg.sprite.Group, bombs: pg.sprite.Group, screen: pg.Surface):
+        # 画面全体に透明度のある黄色の矩形を表示（0.05秒）
+        emp_surface = pg.Surface((WIDTH, HEIGHT), pg.SRCALPHA)
+        emp_surface.fill((255, 255, 0, 100))  # 黄色、不透明度100/255
+        screen.blit(emp_surface, (0, 0))
+        pg.display.update()
+        time.sleep(0.05)
+
+        # 敵機の無効化
+        for emy in emys:
+            emy.interval = math.inf  # 爆弾投下インターバルを無限大に
+            emy.image = pg.transform.laplacian(emy.image)  # ラプラシアンフィルタを適用
+
+        # 爆弾の無効化
+        for bomb in bombs:
+            bomb.speed /= 2  # 速度を半減
+            bomb.state = "inactive"  # 状態を非活性に変更
+
+class Life:
+    """
+    残機数のクラス
+    爆弾に当たるたびに1減る
+    """
+    def __init__(self, num:int):
+        self.num = num
+        self.heart = pg.Surface((40,40))
+
+        
+        self.rect = self.heart.get_rect()
+        points = [(16*math.sin(t/100)**3 +20,-(13*math.cos(t/100)-5*math.cos(2*t/100)-2*math.cos(3*t/100)-math.cos(4*t/100)) +20) for t in range(0, 628) ]
+        pg.draw.polygon(self.heart, (255,0,0), points)
+        self.heart.set_colorkey((0,0,0))
+    def update(self,screen: pg.Surface):
+        for i in range(self.num):
+            x = (WIDTH - 50) - (i * 40)
+            y = HEIGHT - 50
+            self.rect.center = (x, y)
+            screen.blit(self.heart, self.rect)
+
+        
+
+#重力のクラス
+class Gravity(pg.sprite.Sprite):
+    def __init__(self, life):
+        super().__init__()  
+        self.image = pg.Surface((WIDTH, HEIGHT))
+        pg.draw.rect(self.image, (0, 0, 0), (0, 0, WIDTH, HEIGHT))
+        self.image.set_alpha(128)
+        self.rect = self.image.get_rect()
+        self.life = life  
+
+    def update(self):
+        self.life -= 1
+        if self.life < 0:
+            self.kill()
 
 class Life:
     """
@@ -310,6 +366,13 @@ def main():
                     score.value -= 200
                     gravitys.add(Gravity(400))  
         
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_SPACE:
+                    beams.add(Beam(bird))
+                # 【追加】「e」キー押下かつスコアが20より大きい場合、EMPを発動
+                if event.key == pg.K_e and score.value > 20:
+                    EMP(emys, bombs, screen)
+                    score.value -= 20
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
